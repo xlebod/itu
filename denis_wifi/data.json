@@ -1,0 +1,10 @@
+{
+    "ssid": "Test Wifi",
+    "signalStrength": -30,
+    "linkQuality": 0,
+    "channel":"1",
+    "encryption":"WPA",
+    "frequency":"2.427GHz",
+    "interface":"wlan0",
+    "sentPackets": 0
+}

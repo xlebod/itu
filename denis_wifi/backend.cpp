@@ -8,6 +8,10 @@
 #include <QtCore/QtMath>
 #include <QPointF>
 #include <iostream>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QDebug>
 
 QT_CHARTS_USE_NAMESPACE
 
@@ -15,112 +19,187 @@ Q_DECLARE_METATYPE(QAbstractSeries *)
 Q_DECLARE_METATYPE(QAbstractAxis *)
 
 BackEnd::BackEnd(QObject *parent) :
-    QObject(parent),
-    m_index(-1)
+    QObject(parent)
 {
     qRegisterMetaType<QAbstractSeries*>();
     qRegisterMetaType<QAbstractAxis*>();
 }
 
+void BackEnd::graphData()
+{
+    QPointF point;
+    point.setY(linkQuality);
+    if(m_data.size() >= 10){
+        point.setX(9);
+        m_data.pop_front();
+        m_data.append(point);
+        for(int i = 0; i < 10; i++){
+            QPointF temp = m_data.at(i);
+            temp.setX(i);
+            m_data.replace(i,temp);
+        }
+        return;
+    }
+    point.setX(m_data.size());
+    m_data.append(point);
+}
+
 void BackEnd::update(QAbstractSeries *series)
 {
         QXYSeries *xySeries = static_cast<QXYSeries *>(series);
+        qDebug() << m_data;
         xySeries->replace(m_data);
 }
+bool BackEnd::loadFile(QString file_path)
+{
 
+    QFile file_obj(file_path);
+    if(!file_obj.exists()){
+        std::cout << "You're fucked." << std::endl;
+        exit(1);
+    }
+    if (!file_obj.open(QIODevice::ReadOnly)) {
+        std::cout << "Failed to open file " << std::endl;
+        exit(1);
+        }
+    QTextStream file_text(&file_obj);
+    QString json_string;
+    json_string = file_text.readAll();
+    file_obj.close();
+    QByteArray json_bytes = json_string.toLocal8Bit();
+    json_doc = QJsonDocument::fromJson(json_bytes);
+
+    if (json_doc.isNull()) {
+        std::cout << "Failed to create JSON doc." << std::endl;
+        return false;
+    }
+    if (!json_doc.isObject()) {
+        std::cout << "JSON is not an object." << std::endl;
+        return false;
+    }
+
+    json_obj = json_doc.object();
+
+    if (json_obj.isEmpty()) {
+        std::cout << "JSON object is empty." << std::endl;
+        return false;
+    }
+
+    emit network_changed();
+    return true;
+}
 void BackEnd::generateData()
 {
-    QPointF point;
-    BackEnd::scan_station();
-    point.setY(st_sig_strength);
-   if(m_data.size() >= 10){
-       point.setX(10);
-       m_data.pop_back();
-       m_data.prepend(point);
-       return;
-   }
+    ssid = get_ssid();
+    channel = get_channel();
+    encryption = get_enc();
+    frequency = get_frq();
+    interface = get_interface();
+    signalStrength = get_sS();
+    linkQuality = get_lQ();
+    sentPackets = get_packets();
+}
+QString BackEnd::get_ssid()
+{
 
-   std::cout << point.x();
+    if(ssid != json_obj["ssid"].toString())
+        ssid = json_obj["ssid"].toString();
+    return ssid;
 }
 
-int BackEnd::gen_channel(){
-    static int inited = 0;
-    if (!inited){
-        srand(time(NULL));
-        inited = 1;
+QString BackEnd::get_channel()
+{
+
+    if(channel != json_obj["channel"].toString())
+        channel = json_obj["channel"].toString();
+    return channel;
+}
+
+QString BackEnd::get_enc()
+{
+
+    if(encryption != json_obj["encryption"].toString())
+        encryption = json_obj["encryption"].toString();
+    return encryption;
+}
+
+QString BackEnd::get_frq()
+{
+
+    if(frequency != json_obj["frequency"].toString())
+        frequency = json_obj["frequency"].toString();
+    return frequency;
+}
+
+QString BackEnd::get_interface()
+{
+
+    if(interface != json_obj["interface"].toString())
+        interface = json_obj["interface"].toString();
+    return interface;
+}
+
+int BackEnd::get_sS()
+{
+    if(signalStrength != json_obj["signalStrength"].toInt()){
+        signalStrength = json_obj["signalStrength"].toInt();
     }
-    return rand()%20;
+    return signalStrength;
 }
 
-
-int BackEnd::find_interface(){
-    FILE * fp = popen ("iw dev | awk '$1==\"Interface\"{print $2}'", "r");
-    if (fp == NULL){
-        fprintf(stderr, "Nepodaril sa vykonat popen\n");
-        return 0;
+int BackEnd::get_lQ()
+{
+    if(linkQuality != json_obj["linkQuality"].toInt()){
+        linkQuality = json_obj["linkQuality"].toInt();
     }
-    int c = 0;
-    for (int i = 0; i < 30; i++){
-        c = fgetc(fp);
-        if (feof(fp) || c == '\n'){
-            c = i;
-            break;
-        }
-        interface_name[i] = c;
+    return linkQuality;
+}
+
+int BackEnd::get_packets()
+{
+    if(sentPackets != json_obj["sentPackets"].toInt()){
+        sentPackets = json_obj["sentPackets"].toInt();
     }
-    interface_name[c] = '\0';
-    pclose(fp);
-    return 1;
+    return sentPackets;
 }
 
-int BackEnd::scan_all(){ // updatnut s initom a sleepom
-    int status;
-    if (errno != EBUSY){
-        status=wifi_scan_all(wifi, bss, 10);
-        return 1;
-    } else {
-        return 0;
+void BackEnd::set_sS()
+{
+    int inc = rand() % 5 + (-2);
+    int newVal = json_obj["signalStrength"].toInt() + inc;
+    if (newVal >= -30)
+        newVal = -30;
+    json_obj.insert("signalStrength",newVal);
+    emit sS_changed();
+}
+
+void BackEnd::set_lQ()
+{
+    int inc = rand() % 7 + (-3);
+    int newVal = json_obj["linkQuality"].toInt() + inc;
+    if (newVal >= 100){
+        newVal = 100;
     }
+    json_obj.insert("linkQuality",newVal);
+    emit lQ_changed();
 }
 
-void BackEnd::set_station_data(){
-    st_sig_strength = station->signal_dbm;
-    st_avg_sig_strength = station->signal_avg_dbm;
-    st_ssid = QString::fromUtf8(station->ssid);
+void BackEnd::set_packets()
+{
+    int inc = rand() % 15 + 2;
+    int newVal = json_obj["sentPackets"].toInt() + inc;
+    json_obj.insert("sentPackets",newVal);
+    emit packets_changed();
 }
 
-int BackEnd::scan_station(){
-    if (!find_interface()){
-        return 1;
-    }
-    wifi = wifi_scan_init(interface_name);
-    int status;
-        if (errno != EBUSY){
-            status=wifi_scan_station(wifi, station);
-            set_station_data();
-          //  emit success_station();
-          //  appendFile("scan.out");
-    }
+void BackEnd::resetData()
+{
+    json_obj.insert("ssid","Test Wifi");
+    json_obj.insert("signalStrength", -36);
+    json_obj.insert("linkQuality", 95);
+    json_obj.insert("channel","1");
+    json_obj.insert("encryption","WPA");
+    json_obj.insert("frequency","2.427GHz");
+    json_obj.insert("interface", "wlan0");
+    json_obj.insert("sentPackets",0);
 }
-
-void BackEnd::close_scanner(){
-    wifi_scan_close(wifi);
-}
-
-void BackEnd::appendFile(std::string file_name){
-  std::fstream file;
-
-  if(access( file_name.c_str(), F_OK ) == -1){
-    //does no exist, creating a new file
-    file.open(file_name, std::fstream::in | std::fstream::app);
-    //appending the firs row
-    const std::string first_row = "id,ssid,signal strength,average signal strenght\n";
-    file << first_row;
-  }else{
-    file.open(file_name, std::fstream::in | std::fstream::app);
-  }
-  const std::string output = std::to_string(f_id) + "," + station->ssid + "," + std::to_string(station->signal_dbm) + "," + std::to_string(station->signal_avg_dbm) + "\n";
-  file << output;
-  file.close();
-}
-

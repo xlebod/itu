@@ -19,8 +19,8 @@ ApplicationWindow {
             y: 100
             width: 241
             height: 41
+            text: backEnd.ssid
             color: "#ffffff"
-            text: qsTr("Network SSID")
             styleColor: "#ffffff"
             font.bold: true
             fontSizeMode: Text.VerticalFit
@@ -40,6 +40,7 @@ ApplicationWindow {
             height: 211
             color: "#ffffff"
             radius: 50
+            visible: true
             anchors.right: parent.right
             anchors.rightMargin: 13
             anchors.top: parent.top
@@ -92,7 +93,7 @@ ApplicationWindow {
                 y: 0
                 height: 14
                 color: "#ffffff"
-                text: qsTr("1")
+                text: backEnd.channel
                 anchors.left: parent.right
                 anchors.leftMargin: 6
                 font.pixelSize: 12
@@ -103,7 +104,7 @@ ApplicationWindow {
                 width: 112
                 height: 14
                 color: "#ffffff"
-                text: qsTr("Avr. Signal Str.:")
+                text: qsTr("Encryption.:")
                 font.bold: true
                 horizontalAlignment: Text.AlignRight
                 anchors.left: parent.left
@@ -115,10 +116,10 @@ ApplicationWindow {
                 Text {
                     id: element10
                     y: 0
-                    width: 53
+                    width: element9.width
                     height: 15
                     color: "#ffffff"
-                    text: qsTr("-53 dBm")
+                    text: backEnd.encryption
                     anchors.left: parent.right
                     anchors.leftMargin: 6
                     font.pixelSize: 12
@@ -142,12 +143,66 @@ ApplicationWindow {
                 Text {
                     id: element11
                     y: 0
+                    width: element9.width
                     color: "#ffffff"
-                    text: qsTr("2.4GHz")
+                    text: backEnd.frequency
                     anchors.left: parent.right
                     anchors.leftMargin: 6
                     font.pixelSize: 12
                 }
+            }
+
+            Text {
+                id: element13
+                x: -299
+                width:parent.width
+                height: parent.height
+                color: "#ffffff"
+                text: qsTr("Interface:")
+                font.bold: true
+                horizontalAlignment: Text.AlignRight
+                anchors.top: element4.bottom
+                anchors.topMargin: 3
+                anchors.horizontalCenter: parent.horizontalCenter
+                font.pixelSize: 12
+
+                Text {
+                    id: element14
+                    width: element9.width
+                    color: "#ffffff"
+                    text: backEnd.interface
+                    anchors.left: parent.right
+                    anchors.leftMargin: 6
+                    anchors.top: parent.top
+                    anchors.topMargin: 0
+                    font.pixelSize: 12
+                }
+            }
+
+            Text {
+                id: element15
+                x: -308
+                width: parent.width
+                height: parent.height
+                color: "#ffffff"
+                text: qsTr("Sent Packets:")
+                font.pixelSize: 12
+                font.bold: true
+                anchors.topMargin: 3
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: element13.bottom
+                Text {
+                    id: element16
+                    width: element9.width
+                    color: "#ffffff"
+                    text: backEnd.sentPackets
+                    font.pixelSize: 12
+                    anchors.topMargin: 0
+                    anchors.left: parent.right
+                    anchors.leftMargin: 6
+                    anchors.top: parent.top
+                }
+                horizontalAlignment: Text.AlignRight
             }
         }
 
@@ -160,7 +215,7 @@ ApplicationWindow {
             transformOrigin: Item.Left
             enabled: false
             indeterminate: false
-            value: 0.5
+            value: (backEnd.signalStrength + 90) / 60
         }
 
         Text {
@@ -182,7 +237,7 @@ ApplicationWindow {
             y: 216
             width: appWindow.width - 450
             height: 38
-            value: 0.5
+            value: backEnd.linkQuality / 100
             enabled: false
             indeterminate: false
         }
@@ -210,20 +265,22 @@ ApplicationWindow {
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 42
             anchors.horizontalCenter: parent.horizontalCenter
+
             LineSeries {
                 id: chart
+                useOpenGL: true
                 axisY: ValueAxis {
                     min: 0
                     max: 100
                 }
                 axisX: ValueAxis{
                     min: 0
-                    max: 10
+                    max: 9
                 }
                 name: "Signal Strength"
             }
             Timer{
-                interval: 1500; repeat: true; running: true
+                id:graphTimer; interval: 1005; repeat: true
                 onTriggered: {
                     backEnd.update(chartView.series(0))
                 }
@@ -236,7 +293,7 @@ ApplicationWindow {
             width: 34
             height: 15
             color: "#ffffff"
-            text: qsTr("50%")
+            text: backEnd.signalStrength
             anchors.left: progressBar.right
             anchors.leftMargin: 10
             font.pixelSize: 12
@@ -246,30 +303,40 @@ ApplicationWindow {
             id: element8
             y: 228
             color: "#ffffff"
-            text: qsTr("50 %")
+            text: backEnd.linkQuality
             anchors.left: progressBar1.right
             anchors.leftMargin: 10
             font.pixelSize: 12
         }
 
-        Text {
-            id: element12
-            x: 56
-            y: 55
-            text: chart.count
-            font.pixelSize: 12
-        }
-    }
-    Timer{
-        interval: 500; repeat:true; running: true
-
-        onTriggered: function deleteGraph() {
-            chart.replace(y0.x,y0.y,y0.x,y1.y)
-            chart.replace(y1.x,y1.y,y1.x,y2.y)
-            chart.replace(y2.x,y2.y,y2.x,y3.x)
-        }
     }
     BackEnd{
         id: backEnd
     }
+    Timer{
+        interval: 0; repeat: false; running: true
+        onTriggered: {
+            backEnd.loadFile("../denis_wifi/data.json")
+            backEnd.resetData();
+            backEnd.generateData();
+            timer1.running = true;
+        }
+    }
+    Timer{
+        interval: 1000; repeat: true; id:timer1
+        onTriggered:{
+            backEnd.set_lQ();
+            backEnd.set_sS();
+            backEnd.set_packets();
+            backEnd.graphData();
+            graphTimer.running = true;
+        }
+    }
 }
+
+/*##^##
+Designer {
+    D{i:12;anchors_x:126;anchors_y:3}D{i:11;anchors_y:61}D{i:14;anchors_x:126;anchors_y:3}
+D{i:13;anchors_y:-8}
+}
+##^##*/
